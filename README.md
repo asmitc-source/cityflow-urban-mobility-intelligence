@@ -181,6 +181,8 @@ See `sql/schema.sql` and `sql/marts.sql`.
 
 On first startup, the app prepares a compact DuckDB warehouse automatically so the dashboard can be opened directly from a public Streamlit URL. For a larger hosted run, set `CITYFLOW_BOOTSTRAP_ROWS` in the Streamlit app settings.
 
+The repo pins Python 3.11 through `runtime.txt` for predictable hosted builds.
+
 Optional geospatial and explainability dependencies are listed in `requirements-optional.txt`.
 
 ### Docker / VM
