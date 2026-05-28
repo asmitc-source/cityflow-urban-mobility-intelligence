@@ -4,7 +4,7 @@ numpy
 pandas
 plotly
 pyarrow
+pydeck
 PyYAML
 scikit-learn
 streamlit
-
