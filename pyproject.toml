@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cityflow-urban-analytics"
+version = "1.0.0"
+description = "Production-style urban mobility and infrastructure analytics platform for Indian cities."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Asmit", email = "casmit510@gmail.com" }
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

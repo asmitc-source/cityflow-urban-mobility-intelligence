@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+data/processed/*.parquet
+data/warehouse/*.duckdb
+models/*.joblib
+models/model_metrics.json
+.streamlit/secrets.toml
+
