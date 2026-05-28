@@ -176,8 +176,12 @@ See `sql/schema.sql` and `sql/marts.sql`.
 
 1. Push the repo to GitHub.
 2. Set `app/streamlit_app.py` as the app entrypoint.
-3. Include a prebuilt DuckDB warehouse or run the pipeline during setup.
+3. Deploy from the `main` branch.
 4. Install from `requirements.txt`.
+
+On first startup, the app prepares a compact DuckDB warehouse automatically so the dashboard can be opened directly from a public Streamlit URL. For a larger hosted run, set `CITYFLOW_BOOTSTRAP_ROWS` in the Streamlit app settings.
+
+Optional geospatial and explainability dependencies are listed in `requirements-optional.txt`.
 
 ### Docker / VM
 

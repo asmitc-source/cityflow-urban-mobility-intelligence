@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -13,7 +14,8 @@ import streamlit as st
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(ROOT / "src"))
 
-from cityflow.data.warehouse import build_marts, connect_warehouse
+from cityflow.data.generate import build_city_dimension, build_corridor_dimension, generate_mobility_observations, write_partitioned_parquet
+from cityflow.data.warehouse import build_marts, connect_warehouse, initialize_schema, load_dimensions, load_fact
 from cityflow.services.recommendations import build_recommendations
 from cityflow.utils.config import project_path
 
@@ -45,8 +47,45 @@ CUSTOM_CSS = """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 
+def bootstrap_warehouse(rows: int = 150_000) -> None:
+    city_path = project_path("data", "processed", "dim_city.parquet")
+    corridor_path = project_path("data", "processed", "dim_corridor.parquet")
+    fact_path = project_path("data", "processed", "fact_mobility_observations.parquet")
+
+    cities = build_city_dimension()
+    corridors = build_corridor_dimension(seed=42)
+    facts = generate_mobility_observations(
+        rows=rows,
+        corridors=corridors,
+        start_date="2024-01-01",
+        days=180,
+        seed=42,
+    )
+
+    write_partitioned_parquet(cities, city_path)
+    write_partitioned_parquet(corridors, corridor_path)
+    write_partitioned_parquet(facts, fact_path)
+
+    conn = connect_warehouse()
+    initialize_schema(conn)
+    load_dimensions(conn, city_path, corridor_path)
+    load_fact(conn, fact_path)
+    build_marts(conn)
+    conn.close()
+
+
+def ensure_warehouse() -> None:
+    db_path = project_path("data", "warehouse", "cityflow.duckdb")
+    if db_path.exists():
+        return
+    rows = int(os.getenv("CITYFLOW_BOOTSTRAP_ROWS", "150000"))
+    with st.spinner(f"Preparing CityFlow warehouse ({rows:,} records)..."):
+        bootstrap_warehouse(rows=rows)
+
+
 @st.cache_resource
 def get_connection() -> duckdb.DuckDBPyConnection:
+    ensure_warehouse()
     conn = connect_warehouse()
     build_marts(conn)
     return conn
@@ -181,15 +220,17 @@ def render_corridor_table(corridors: pd.DataFrame) -> None:
 def render_predictive_section(corridors: pd.DataFrame) -> None:
     st.markdown("<div class='section-title'>Predictive Insights</div>", unsafe_allow_html=True)
     metrics_path = project_path("models", "model_metrics.json")
+    fallback_metrics_path = project_path("reports", "model_metrics.json")
     left, right = st.columns([0.45, 0.55])
     with left:
-        if metrics_path.exists():
-            metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+        if metrics_path.exists() or fallback_metrics_path.exists():
+            source = metrics_path if metrics_path.exists() else fallback_metrics_path
+            metrics = json.loads(source.read_text(encoding="utf-8"))
             st.metric("Hotspot Model Accuracy", f"{metrics.get('hotspot_label', {}).get('accuracy', 0):.2%}")
             st.metric("Severity Model Accuracy", f"{metrics.get('severity_label', {}).get('accuracy', 0):.2%}")
             st.metric("Delay Estimator MAE", f"{metrics.get('delay_min', {}).get('mae', 0):.2f} min")
         else:
-            st.info("Run `python scripts/train_models.py` to populate production model metrics.")
+            st.info("Model metrics are produced by the training pipeline.")
     with right:
         top = corridors.head(10).sort_values("hotspot_probability")
         fig = go.Figure(
@@ -218,7 +259,7 @@ def main() -> None:
     try:
         cities = load_city_list()
     except Exception:
-        st.error("CityFlow warehouse not found. Run `python scripts/run_pipeline.py --rows 250000` first.")
+        st.error("CityFlow could not prepare the analytics warehouse. Please retry the app after the first startup completes.")
         st.stop()
 
     with st.sidebar:
@@ -239,4 +280,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
